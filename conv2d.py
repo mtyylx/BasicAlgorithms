@@ -47,14 +47,58 @@ def conv2d2(img, kernel):
     return feature_maps
 
 
-img = np.random.randint(0, 9, size=(3, 3, 3)).astype(np.float32)
-kernel = np.random.randint(0, 9, size=(2, 2, 3, 1)).astype(np.float32)
+# 支持 Stride 的二维卷积实现。注意for循环遍历的是输出索引，输入索引需要乘以stride的倍数。
+def conv2d_with_stride(img, kernel, stride):
+    height, width, in_channels = img.shape
+    kernel_height, kernel_width, in_channels, out_channels = kernel.shape
+    out_height = (height - kernel_height)//stride + 1
+    out_width = (width - kernel_width)//stride + 1
+    feature_maps = np.zeros(shape=(out_height, out_width, out_channels))
+    print('Output Shape = ', feature_maps.shape)
+    for oc in range(out_channels):              # Conv with each kernel
+        for h in range(out_height):             # Scan height
+            for w in range(out_width):          # Scan width
+                h_stride = h * stride           # h 作为输出索引，h_stride 作为输入索引
+                w_stride = w * stride           # w 作为输出索引，w_stride 作为输入索引
+                patch = img[h_stride: h_stride + kernel_height, w_stride: w_stride + kernel_width, :]
+                feature_maps[h, w, oc] = np.sum(patch * kernel[:, :, :, oc])
 
-A = tf.Variable(np.expand_dims(img, axis=0))
-C = tf.nn.conv2d(input=A, filter=kernel, strides=[1, 1, 1, 1], padding='VALID')
-with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
-    print(sess.run(C))
+    return feature_maps
 
-print(conv2d(img, kernel))
-print(conv2d2(img, kernel))
+
+def test1():
+    img = np.random.randint(0, 9, size=(3, 3, 3)).astype(np.float32)
+    kernel = np.random.randint(0, 9, size=(2, 2, 3, 1)).astype(np.float32)
+
+    A = tf.Variable(np.expand_dims(img, axis=0))
+    C = tf.nn.conv2d(input=A, filter=kernel, strides=[1, 1, 1, 1], padding='VALID')
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        tf_result = sess.run(C)
+        tf_result = tf_result[0]
+
+    my_result = conv2d(img, kernel)
+    print(tf_result)
+    print(my_result)
+    print('\nResult Matched with TF:', np.array_equal(tf_result, my_result))
+
+
+def test2():
+    img = np.random.randint(0, 9, size=(10, 10, 3)).astype(np.float32)
+    kernel = np.random.randint(0, 9, size=(3, 3, 3, 1)).astype(np.float32)
+
+    A = tf.Variable(np.expand_dims(img, axis=0))
+    C = tf.nn.conv2d(input=A, filter=kernel, strides=[1, 3, 3, 1], padding='VALID')
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        tf_result = sess.run(C)
+        tf_result = tf_result[0]
+
+    my_result = conv2d_with_stride(img, kernel, stride=3)
+    print(tf_result)
+    print(my_result)
+    print('\nResult Matched with TF:', np.array_equal(tf_result, my_result))
+
+
+test1()
+test2()
